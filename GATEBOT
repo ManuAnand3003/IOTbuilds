@@ -1,0 +1,104 @@
+//THIS IS THE CODE FOR GATEBOT OR PARKING LOT CONTROL PROJECT.
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <Servo.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+Servo myservo;
+
+const int IR1 = 2; // Entry
+const int IR2 = 3; // Exit
+
+const int TOTAL_SLOTS = 4;
+int availableSlots = TOTAL_SLOTS;
+
+bool gateOpen = false;
+
+void setup() {
+  Serial.begin(9600);
+  lcd.init();
+  lcd.backlight();
+
+  pinMode(IR1, INPUT);
+  pinMode(IR2, INPUT);
+
+  myservo.attach(4);
+  myservo.write(100); // Closed position
+
+  lcd.setCursor(0, 0);
+  lcd.print("     ARDUINO    ");
+  lcd.setCursor(0, 1);
+  lcd.print(" PARKING SYSTEM ");
+  delay(2000);
+  lcd.clear();
+}
+
+void loop() {
+  // ENTRY SEQUENCE
+  if (digitalRead(IR1) == LOW && availableSlots > 0) {
+    openGate();
+
+    // Wait for IR2 to be triggered (car passes through)
+    while (digitalRead(IR2) == HIGH);
+    delay(100); // Debounce
+
+    if (availableSlots > 0) {
+      availableSlots--;
+    }
+    closeGate();
+  }
+
+  // EXIT SEQUENCE
+  else if (digitalRead(IR2) == LOW) {
+    openGate();
+
+    // Wait for IR1 to be triggered (car passes out)
+    while (digitalRead(IR1) == HIGH);
+    delay(100); // Debounce
+
+    if (availableSlots < TOTAL_SLOTS) {
+      availableSlots++;
+    }
+    closeGate();
+  }
+
+  // LCD Display
+  lcd.setCursor(0, 0);
+  lcd.print("    WELCOME!    ");
+
+  if (availableSlots == 0) {
+    scrollFullMessage();
+  } else {
+    lcd.setCursor(0, 1);
+    lcd.print("Slots Left: ");
+    lcd.print(availableSlots);
+    lcd.print("  ");
+    delay(300);
+  }
+}
+
+void openGate() {
+  if (!gateOpen) {
+    myservo.write(0); // Open
+    gateOpen = true;
+  }
+}
+
+void closeGate() {
+  myservo.write(100); // Close
+  gateOpen = false;
+}
+
+void scrollFullMessage() {
+  String msg = "   Parking Full   ";
+  for (int i = 0; i <= msg.length() - 16; i++) {
+    lcd.setCursor(0, 1);
+    lcd.print(msg.substring(i, i + 16));
+    delay(300);
+
+    if (availableSlots > 0) {
+      lcd.clear();
+      return;
+    }
+  }
+}
